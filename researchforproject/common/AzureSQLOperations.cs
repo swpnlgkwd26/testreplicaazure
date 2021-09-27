@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.SqlClient;
 using System.Text;
 using System.Threading;
@@ -87,6 +88,81 @@ namespace common
             {
                 sqlConnection.Close();
             }
+        }
+
+
+        // Bulk Upload  Data
+        public static void BulkUpload(string connectionString)
+        {
+
+            DataTable tbl = new DataTable();
+            tbl.Columns.Add(new DataColumn("EmpId", typeof(Int32)));
+            tbl.Columns.Add(new DataColumn("EmpName", typeof(string)));
+            tbl.Columns.Add(new DataColumn("Salary", typeof(Int32)));
+            for (int i = 0; i < 100000; i++)
+            {
+                DataRow dr = tbl.NewRow();
+                dr["EmpId"] = i;
+                dr["EmpName"] = "Test"+i;
+                dr["Salary"] = i;              
+
+                tbl.Rows.Add(dr);
+            }
+
+            SqlConnection con = new SqlConnection(connectionString);
+            //create object of SqlBulkCopy which help to insert  
+            SqlBulkCopy objbulk = new SqlBulkCopy(con);
+
+            //assign Destination table name  
+            objbulk.DestinationTableName = "Employee";
+
+            objbulk.ColumnMappings.Add("EmpId", "EmpId");
+            objbulk.ColumnMappings.Add("EmpName", "EmpName");
+            objbulk.ColumnMappings.Add("Salary", "Salary");
+            
+
+            con.Open();
+            //insert bulk Records into DataBase.  
+            objbulk.WriteToServer(tbl);
+            con.Close();
+        }
+
+
+        // Update Operation
+
+        public static void UpdateAzureSQLData(string connectionString)
+        {
+            while (true)
+            {
+                SqlConnection sqlConnection = new SqlConnection();
+                try
+                {
+                    // Started
+                    sqlConnection.ConnectionString = connectionString;
+                    sqlConnection.Open();
+                    
+                    SqlCommand cmd = null; 
+                    for (int i = 1; i < 1000000; i++)
+                    {
+                        string empName = "Updated Test" + i.ToString();
+                        Thread.Sleep(100);
+                        string commandQuery = $"Update Employee Set EmpName='{empName}' Where EmpId =" + i;
+                        cmd = new SqlCommand(commandQuery, sqlConnection);
+                        cmd.ExecuteNonQuery();
+                        Console.WriteLine("Employee Updated : " + i);
+                    }
+                }
+                catch (Exception ex)
+                {
+
+                    Console.WriteLine(ex.Message);
+                }
+                finally
+                {
+                    sqlConnection.Close();
+                }
+            }
+         
         }
     }
 }
