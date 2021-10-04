@@ -92,39 +92,65 @@ namespace common
 
 
         // Bulk Upload  Data
-        public static void BulkUpload(string connectionString)
+        public static DataTable CreateDataTable(int start, int end)
         {
+
 
             DataTable tbl = new DataTable();
             tbl.Columns.Add(new DataColumn("EmpId", typeof(Int32)));
             tbl.Columns.Add(new DataColumn("EmpName", typeof(string)));
             tbl.Columns.Add(new DataColumn("Salary", typeof(Int32)));
-            for (int i = 0; i < 100000; i++)
+            for (int i = start; i < end; i++)
             {
                 DataRow dr = tbl.NewRow();
                 dr["EmpId"] = i;
-                dr["EmpName"] = "Test"+i;
-                dr["Salary"] = i;              
+                dr["EmpName"] = "Test" + i;
+                dr["Salary"] = i;
 
                 tbl.Rows.Add(dr);
             }
+            return tbl;
 
+        }
+
+        public static List<DataTable> GetDataTable(string connectionString)
+        {
+            Console.WriteLine("Table Created");
+            List<DataTable> dataTables = new List<DataTable>();
+            int start = 0;
+            int end = start + 100000;
+            for (int i = 0; i < 5; i++)
+            {
+
+                var tbl = CreateDataTable(start, end);
+                dataTables.Add(tbl);
+
+                start = end;
+                end = start + 100000;
+            }
+
+            return dataTables;
+        }
+        public static void BulkDataUpload(DataTable tbl, string connectionString)
+        {
             SqlConnection con = new SqlConnection(connectionString);
             //create object of SqlBulkCopy which help to insert  
             SqlBulkCopy objbulk = new SqlBulkCopy(con);
 
             //assign Destination table name  
             objbulk.DestinationTableName = "Employee";
+            objbulk.BulkCopyTimeout = 0;
 
             objbulk.ColumnMappings.Add("EmpId", "EmpId");
             objbulk.ColumnMappings.Add("EmpName", "EmpName");
             objbulk.ColumnMappings.Add("Salary", "Salary");
-            
+
 
             con.Open();
             //insert bulk Records into DataBase.  
             objbulk.WriteToServer(tbl);
-            con.Close();
+            Console.WriteLine("Bulk Data Uploaded");
+            
         }
 
 
@@ -140,8 +166,8 @@ namespace common
                     // Started
                     sqlConnection.ConnectionString = connectionString;
                     sqlConnection.Open();
-                    
-                    SqlCommand cmd = null; 
+
+                    SqlCommand cmd = null;
                     for (int i = 1; i < 1000000; i++)
                     {
                         string empName = "Updated Test" + i.ToString();
@@ -162,7 +188,31 @@ namespace common
                     sqlConnection.Close();
                 }
             }
-         
+
+        }
+
+        public static  void TruncateTableEmp(string connectionString)
+        {
+            SqlConnection sqlConnection = new SqlConnection();
+            try
+            {
+                sqlConnection.ConnectionString = connectionString;
+                sqlConnection.Open();
+                SqlCommand cmd = new SqlCommand("Truncate Table Employee", sqlConnection);
+                cmd.ExecuteNonQuery();
+               // Thread.Sleep(3000);
+                Console.WriteLine("Table Truncated ");
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            finally
+            {
+                sqlConnection.Close();
+            }
+
         }
     }
 }
