@@ -7,9 +7,76 @@ using System.Threading;
 
 namespace common
 {
-    public static class AzureSQLOperations
+    public  class AzureSQLOperations
     {
-        // Returns ReadOnly Or WriteOnly
+
+
+        public static void GetEmployeeDataInfinite(string connectionString)
+        {
+            using (SqlConnection sqlConnection = new SqlConnection())
+            {
+                
+                try
+                {
+                    sqlConnection.ConnectionString = connectionString;
+                    sqlConnection.Open();
+                   var transaction= sqlConnection.BeginTransaction(IsolationLevel.Serializable);
+                    while (true)
+                    {
+
+                        SqlCommand cmd = new SqlCommand("Select * from Employee", sqlConnection, transaction);
+                        SqlDataReader dr = cmd.ExecuteReader();
+                        while (dr.Read())
+                        {
+                            //Thread.Sleep(500);
+                            Console.WriteLine($"EmpId :{dr[0].ToString()} , EmpName : {dr[1].ToString()}, Salary :{dr[2].ToString()}");
+                        }
+                    }
+
+
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+                finally
+                {
+                    sqlConnection.Close();
+                }
+
+            }
+        }
+        public static void GetEmployeeData(string connectionString)
+        {
+            SqlConnection sqlConnection = new SqlConnection();
+            try
+            {
+                sqlConnection.ConnectionString = connectionString;
+                sqlConnection.Open();
+                for (int i = 0; i < 500000; i++)
+                {
+
+                    SqlCommand cmd = new SqlCommand("Select * from Employee where EmpId=" + i.ToString(), sqlConnection);
+                    SqlDataReader dr = cmd.ExecuteReader();
+                    if (dr.Read())
+                    {
+                        Thread.Sleep(500);
+                        Console.WriteLine($"EmpId :{dr[0].ToString()} , EmpName : {dr[1].ToString()}, Salary :{dr[2].ToString()}");
+                    }
+                }
+                
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            finally
+            {
+                sqlConnection.Close();
+            }
+        }
+
         public static void GetReadIntentStatus(string connectionString)
         {
             SqlConnection sqlConnection = new SqlConnection();
@@ -37,7 +104,6 @@ namespace common
 
         }
 
-        // Returns the Count
         public static void ReadCountFromAzureSql(string connectionString)
         {
             SqlConnection sqlConnection = new SqlConnection();
@@ -60,7 +126,6 @@ namespace common
             }
         }
 
-        // Add Data Into Employee Table
         public static void WriteDataIntoAzureSql(string connectionString)
         {
             SqlConnection sqlConnection = new SqlConnection();
@@ -90,8 +155,6 @@ namespace common
             }
         }
 
-
-        // Bulk Upload  Data
         public static DataTable CreateDataTable(int start, int end)
         {
 
@@ -115,11 +178,11 @@ namespace common
 
         public static List<DataTable> GetDataTable(string connectionString)
         {
-            Console.WriteLine("Table Created");
+            
             List<DataTable> dataTables = new List<DataTable>();
             int start = 0;
             int end = start + 100000;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 15; i++)
             {
 
                 var tbl = CreateDataTable(start, end);
@@ -131,30 +194,66 @@ namespace common
 
             return dataTables;
         }
+
         public static void BulkDataUpload(DataTable tbl, string connectionString)
         {
             SqlConnection con = new SqlConnection(connectionString);
             //create object of SqlBulkCopy which help to insert  
-            SqlBulkCopy objbulk = new SqlBulkCopy(con);
-
-            //assign Destination table name  
-            objbulk.DestinationTableName = "Employee";
-            objbulk.BulkCopyTimeout = 0;
-
-            objbulk.ColumnMappings.Add("EmpId", "EmpId");
-            objbulk.ColumnMappings.Add("EmpName", "EmpName");
-            objbulk.ColumnMappings.Add("Salary", "Salary");
-
-
             con.Open();
-            //insert bulk Records into DataBase.  
-            objbulk.WriteToServer(tbl);
-            Console.WriteLine("Bulk Data Uploaded");
+            using (var objbulk = new SqlBulkCopy(con))
+            {
+                objbulk.DestinationTableName = "Employee";
+                objbulk.BulkCopyTimeout = 0;
+                // By default all the records in the source  will be written to target table
+                // To reduce the memory consumed by sqlbulkcopy we can use BatchSize
+                objbulk.BatchSize = 10000;
+                objbulk.NotifyAfter = 100000;
+                objbulk.SqlRowsCopied += (sender, eventArgs) => Console.WriteLine(" ** Wrote : " + eventArgs.RowsCopied + " Records **");
+
+                objbulk.ColumnMappings.Add("EmpId", "EmpId");
+                objbulk.ColumnMappings.Add("EmpName", "EmpName");
+                objbulk.ColumnMappings.Add("Salary", "Salary");
+                objbulk.WriteToServer(tbl);
+            }
+            con.Close();           
             
         }
 
+        public static void BulkDataUploadWithTransaction(DataTable tbl, string connectionString)
+        {
+            SqlConnection con = new SqlConnection(connectionString);
+            //create object of SqlBulkCopy which help to insert  
+            con.Open();
+            var transaction = con.BeginTransaction(IsolationLevel.Serializable);
+            using (var objbulk = new SqlBulkCopy(con,SqlBulkCopyOptions.KeepIdentity,transaction))
+            {
+                
+                objbulk.DestinationTableName = "Employee";
+                objbulk.BulkCopyTimeout = 0;
+                // By default all the records in the source  will be written to target table
+                // To reduce the memory consumed by sqlbulkcopy we can use BatchSize
+                objbulk.BatchSize = 10000;
+                objbulk.NotifyAfter = 100000;
+                objbulk.SqlRowsCopied += (sender, eventArgs) => Console.WriteLine(" ** Wrote : " + eventArgs.RowsCopied + " Records **");
 
-        // Update Operation
+                objbulk.ColumnMappings.Add("EmpId", "EmpId");
+                objbulk.ColumnMappings.Add("EmpName", "EmpName");
+                objbulk.ColumnMappings.Add("Salary", "Salary");
+                try
+                {
+                    objbulk.WriteToServer(tbl);
+                    transaction.Commit();
+                }
+                catch (Exception)
+                {
+
+                    transaction.Rollback();
+                }
+               
+            }
+            con.Close();
+
+        }
 
         public static void UpdateAzureSQLData(string connectionString)
         {
@@ -213,6 +312,54 @@ namespace common
                 sqlConnection.Close();
             }
 
+        }
+
+        public static void CreateClusteredIndex(string connectionString)
+        {
+            SqlConnection sqlConnection = new SqlConnection();
+            try
+            {
+                sqlConnection.ConnectionString = connectionString;
+                sqlConnection.Open();
+                SqlCommand cmd = new SqlCommand("CREATE NONCLUSTERED INDEX IX_EmpIndex ON Employee(EmpName) ", sqlConnection);
+
+                //SqlCommand cmd = new SqlCommand("ALTER INDEX ALL ON Employee Rebuild ", sqlConnection);
+                cmd.ExecuteNonQuery();
+                // Thread.Sleep(3000);
+                Console.WriteLine("Index Created on EmpId");
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            finally
+            {
+                sqlConnection.Close();
+            }
+        }
+
+        public static void DropClusteredIndex(string connectionString)
+        {
+            SqlConnection sqlConnection = new SqlConnection();
+            try
+            {
+                sqlConnection.ConnectionString = connectionString;
+                sqlConnection.Open();
+                SqlCommand cmd = new SqlCommand("Drop Index IX_EmpIndex ON [dbo].Employee", sqlConnection);
+                cmd.ExecuteNonQuery();
+                // Thread.Sleep(3000);
+                Console.WriteLine("Index Deleted on EmpId");
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            finally
+            {
+                sqlConnection.Close();
+            }
         }
     }
 }

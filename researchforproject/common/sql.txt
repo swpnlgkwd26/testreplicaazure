@@ -1,0 +1,15 @@
+﻿ Create table Employee
+(
+ EmpId int ,
+ EmpName Varchar(30),
+ Salary int
+ )
+ Insert into [dbo].[Employee] Values(1,'A',32323)
+
+ Select * From [dbo].[Employee]
+
+ Truncate Table [dbo].[Employee]
+
+ Drop table [dbo].[Employee]
+
+ CREATE NONCLUSTERED INDEX IX_EmpIndex ON Employee(EmpName)

@@ -19,7 +19,7 @@ namespace replicaclient
             int i = Convert.ToInt32(Console.ReadLine());
             if (i==1)
             {
-                AzureSQLOperations.BulkDataUpload(connectionString);
+              //  AzureSQLOperations.BulkDataUpload(connectionString);
             }
             else if(i==2)
             {
